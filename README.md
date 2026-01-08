@@ -64,7 +64,7 @@ During the analysis, we found the top drivers for house prices are:
 
 ### 📜 License
 This project is open-source and available for educational purposes.
-## 📂 Project Structure
+### 📂 Project Structure
 ```bash
 ├── House Price Prediction.ipynb   # Jupyter Notebook for Data Cleaning & Training
 ├── app.py                         # Main Streamlit Application Code
@@ -72,6 +72,7 @@ This project is open-source and available for educational purposes.
 ├── Project-House-Price-File.csv   # Original Dataset
 ├── requirements.txt               # List of dependencies
 └── README.md                      # Project Documentation
-
+```
+---
 ✨ Built with ❤️ by Rishav Kumar Shrivastava
 
