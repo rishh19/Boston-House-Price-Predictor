@@ -112,8 +112,6 @@ st.markdown("Welcome! Configure a house in the sidebar and get an instant market
 
 # Use a container to apply the 'card' background
 with st.container():
-    st.markdown('<div class="main-card">', unsafe_allow_html=True)
-    
     col1, col2 = st.columns([3, 2])
 
     with col1:
