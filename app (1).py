@@ -1,159 +1,68 @@
 import streamlit as st
-import pickle
-import numpy as np
 import pandas as pd
+import xgboost
+import pickle
 
 # 1. Load the Model
-# Ensure this file is in the same folder!
 model = pickle.load(open('house_price_model.pkl', 'rb'))
 
-# 2. Page Configuration
-st.set_page_config(
-    page_title="Boston Real Estate AI Predictor",
-    page_icon="🏡",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# 2. Page Configuration (Title and Layout)
+st.set_page_config(page_title="Boston House Price Predictor", page_icon="🏡", layout="wide")
 
-# --- Session State for Reset Functionality ---
-defaults = {
-    'RM': 6.0, 'LSTAT': 10.0, 'PTRATIO': 15.0, 'CRIM': 0.1,
-    'ZN': 10.0, 'INDUS': 5.0, 'CHAS': 0, 'NOX': 0.5,
-    'AGE': 50, 'DIS': 4.0, 'RAD': 5, 'TAX': 300, 'B': 390.0
-}
+st.title("🏡 Boston Real Estate AI Predictor")
+st.write("Welcome! Configure a house in the sidebar and get an instant market value estimation powered by XGBoost.")
 
-# Initialize session state
-for key, value in defaults.items():
-    if key not in st.session_state:
-        st.session_state[key] = value
-
-def reset_values():
-    for key, value in defaults.items():
-        st.session_state[key] = value
-
-# --- Custom CSS for Enhanced UI ---
-st.markdown("""
-    <style>
-    /* Main Background gradient */
-    .stApp {
-        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-    }
-    /* Card-like container for main content */
-    .main-card {
-        background-color: #ffffff;
-        padding: 2rem;
-        border-radius: 15px;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    }
-    /* Sidebar background */
-    [data-testid="stSidebar"] {
-        background-color: #f0f2f6;
-        border-right: 1px solid #dce1e6;
-    }
-    /* Primary Button Styling (Predict) */
-    .stButton>button[data-testid="baseButton-primary"] {
-        width: 100%;
-        background: linear-gradient(to right, #FF512F, #DD2476);
-        color: white;
-        border: none;
-        font-weight: bold;
-        transition: all 0.3s ease;
-    }
-    /* Secondary Button Styling (Reset) */
-    .stButton>button[data-testid="baseButton-secondary"] {
-        width: 100%;
-        border: 2px solid #555;
-        color: #555;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- Sidebar (Controls) ---
-st.sidebar.title("⚙️ Control Panel")
-
-# FIXED: Changed 'kind' to 'type'
-st.sidebar.button("🔄 Reset All Inputs", on_click=reset_values, type="secondary", help="Reset all features to their default values.")
-
-st.sidebar.markdown("---")
-st.sidebar.write("Adjust features below:")
+# 3. Sidebar Inputs (Collecting Data)
+st.sidebar.header("⚙️ Configure Property")
 
 def user_input_features():
-    # Group 1: Key Drivers
-    with st.sidebar.expander("🔑 Key Features (High Impact)", expanded=True):
-        RM = st.slider("Number of Rooms (RM)", 1.0, 9.0, key='RM')
-        LSTAT = st.slider("Lower Status Population % (LSTAT)", 0.0, 40.0, key='LSTAT')
-        PTRATIO = st.slider("Pupil-Teacher Ratio", 12.0, 22.0, key='PTRATIO')
-        CRIM = st.number_input("Crime Rate (Per Capita)", 0.0, 90.0, step=0.1, key='CRIM')
+    # These are the standard features for the Boston Housing Dataset
+    CRIM = st.sidebar.number_input("Crime Rate (CRIM)", value=0.1)
+    ZN = st.sidebar.number_input("Residential Land Zone (ZN)", value=10.0)
+    INDUS = st.sidebar.number_input("Non-Retail Business Acres (INDUS)", value=5.0)
+    CHAS = st.sidebar.selectbox("Charles River Bound (CHAS)", (0, 1))
+    NOX = st.sidebar.number_input("Nitric Oxide Concentration (NOX)", value=0.5)
+    RM = st.sidebar.number_input("Average Rooms per Dwelling (RM)", value=6.0)
+    AGE = st.sidebar.number_input("Proportion of Owner-Occupied Units Built Prior to 1940 (AGE)", value=50.0)
+    DIS = st.sidebar.number_input("Weighted Distances to Employment Centres (DIS)", value=4.0)
+    RAD = st.sidebar.number_input("Index of Accessibility to Radial Highways (RAD)", value=5.0)
+    TAX = st.sidebar.number_input("Property-Tax Rate (TAX)", value=300.0)
+    PTRATIO = st.sidebar.number_input("Pupil-Teacher Ratio (PTRATIO)", value=15.0)
+    B = st.sidebar.number_input("Proportion of Blacks (B)", value=390.0)
+    LSTAT = st.sidebar.number_input("Lower Status of Population % (LSTAT)", value=5.0)
 
-    # Group 2: Advanced
-    with st.sidebar.expander("📐 Technical Specs & Others"):
-        ZN = st.number_input("Residential Land Zone (ZN)", step=1.0, key='ZN')
-        INDUS = st.number_input("Industrial Business Acres", step=1.0, key='INDUS')
-        CHAS = st.selectbox("By Charles River? (CHAS)", (0, 1), format_func=lambda x: "Yes" if x == 1 else "No", key='CHAS')
-        NOX = st.number_input("Nitric Oxides Concentration", 0.3, 0.9, step=0.01, key='NOX')
-        AGE = st.slider("Age of House (Years)", 0, 100, key='AGE')
-        DIS = st.number_input("Dist. to Employment Centers", 1.0, 12.0, step=0.1, key='DIS')
-        RAD = st.slider("Highway Access Index (1-24)", 1, 24, key='RAD')
-        TAX = st.number_input("Property Tax Rate", 180, 720, step=10, key='TAX')
-        B = st.number_input("Black Proportion", 0.0, 400.0, step=10.0, key='B')
-    
     data = {
         'CRIM': CRIM, 'ZN': ZN, 'INDUS': INDUS, 'CHAS': CHAS, 'NOX': NOX,
         'RM': RM, 'AGE': AGE, 'DIS': DIS, 'RAD': RAD, 'TAX': TAX,
         'PTRATIO': PTRATIO, 'B': B, 'LSTAT': LSTAT
     }
-    return pd.DataFrame(data, index=[0])
+    features = pd.DataFrame(data, index=[0])
+    return features
 
 input_df = user_input_features()
 
-# --- Main Page ---
-st.title("🏡 Boston Real Estate AI Predictor")
-st.markdown("Welcome! Configure a house in the sidebar and get an instant market value estimation powered by **XGBoost**.")
+# 4. Main Page - Displaying Selected Specs (The Fix)
+st.subheader("📋 Selected Property Specs")
 
-# Use a container to apply the 'card' background
-with st.container():
-   
-    
-    col1, col2 = st.columns([3, 2])
+# CHANGE 1: use_container_width=True forces the table to fit the screen width
+# hide_index=True removes the ugly '0' column at the start
+st.dataframe(input_df, use_container_width=True, hide_index=True)
 
-    with col1:
-        st.subheader("📋 Selected Property Specs")
-        st.dataframe(input_df.style.format("{:.2f}"))
-        st.markdown("<br>", unsafe_allow_html=True)
+# 5. Prediction Logic
+if st.button("🚀 Predict Price Now", type="primary"):
+    prediction = model.predict(input_df)
+    st.success(f"💰 Estimated Price: ${prediction[0] * 1000:,.2f}")
 
-        # FIXED: Changed 'kind' to 'type'
-        if st.button("🚀 Predict Price Now", type="primary"):
-            with st.spinner("Calculating..."):
-                prediction = model.predict(input_df)
-                price = prediction[0] * 1000
-            
-            st.success("🎉 Prediction Successful!")
-            st.metric(label="Estimated Market Value", value=f"${price:,.2f}", delta="AI Estimate")
-            
-            st.subheader("Price Tier")
-            if price < 25000:
-                st.warning("📉 Budget / Affordable Range")
-                st.progress(30)
-            elif price < 45000:
-                st.info("📊 Mid-Range Market")
-                st.progress(60)
-            else:
-                st.success("💎 Luxury / High-End")
-                st.progress(90)
+# 6. "How It Works" Section (Moved Below)
+st.markdown("---") # Adds a divider line
+st.subheader("💡 How It Works")
 
-    with col2:
-        st.info("💡 **How It Works**")
-        st.markdown("""
-        This application uses a machine learning model trained on historical housing data.
-        
-        **Key factors influencing the price:**
-        * **Rooms (RM):** The most significant positive factor. More rooms generally equal higher value.
-        * **Neighborhood Status (LSTAT):** A strong negative indicator.
-        * **Location & Services:** Crime rate, school quality (PTRATIO), and distance to employment centers all play a role.
-        """)
-        
-    st.markdown('</div>', unsafe_allow_html=True) # End of main-card div
+# CHANGE 2: Simple layout (no columns) so it sits at the bottom
+st.info("This application uses a machine learning model trained on historical housing data.")
 
-# Footer
-st.markdown("---")
-st.markdown("<div style='text-align: center; color: #888;'>Built with ❤️ as a Professional Portfolio Project using Streamlit & XGBoost.</div>", unsafe_allow_html=True)
+st.markdown("""
+**Key factors influencing the price:**
+* **Rooms (RM):** The most significant positive factor. More rooms generally equal higher value.
+* **Neighborhood Status (LSTAT):** A strong indicator; lower status areas tend to have lower prices.
+* **Crime Rate (CRIM):** Higher crime rates negatively impact property value.
+""")
