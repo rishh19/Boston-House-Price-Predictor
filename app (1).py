@@ -1,68 +1,157 @@
 import streamlit as st
 import pandas as pd
-import xgboost
-import pickle
+import numpy as np
 
-# 1. Load the Model
-model = pickle.load(open('house_price_model.pkl', 'rb'))
+# 1. Page Config
+st.set_page_config(page_title="House Price Predictor", layout="wide")
 
-# 2. Page Configuration (Title and Layout)
-st.set_page_config(page_title="Boston House Price Predictor", page_icon="🏡", layout="wide")
-
-st.title("🏡 Boston Real Estate AI Predictor")
-st.write("Welcome! Configure a house in the sidebar and get an instant market value estimation powered by XGBoost.")
-
-# 3. Sidebar Inputs (Collecting Data)
-st.sidebar.header("⚙️ Configure Property")
-
-def user_input_features():
-    # These are the standard features for the Boston Housing Dataset
-    CRIM = st.sidebar.number_input("Crime Rate (CRIM)", value=0.1)
-    ZN = st.sidebar.number_input("Residential Land Zone (ZN)", value=10.0)
-    INDUS = st.sidebar.number_input("Non-Retail Business Acres (INDUS)", value=5.0)
-    CHAS = st.sidebar.selectbox("Charles River Bound (CHAS)", (0, 1))
-    NOX = st.sidebar.number_input("Nitric Oxide Concentration (NOX)", value=0.5)
-    RM = st.sidebar.number_input("Average Rooms per Dwelling (RM)", value=6.0)
-    AGE = st.sidebar.number_input("Proportion of Owner-Occupied Units Built Prior to 1940 (AGE)", value=50.0)
-    DIS = st.sidebar.number_input("Weighted Distances to Employment Centres (DIS)", value=4.0)
-    RAD = st.sidebar.number_input("Index of Accessibility to Radial Highways (RAD)", value=5.0)
-    TAX = st.sidebar.number_input("Property-Tax Rate (TAX)", value=300.0)
-    PTRATIO = st.sidebar.number_input("Pupil-Teacher Ratio (PTRATIO)", value=15.0)
-    B = st.sidebar.number_input("Proportion of Blacks (B)", value=390.0)
-    LSTAT = st.sidebar.number_input("Lower Status of Population % (LSTAT)", value=5.0)
-
-    data = {
-        'CRIM': CRIM, 'ZN': ZN, 'INDUS': INDUS, 'CHAS': CHAS, 'NOX': NOX,
-        'RM': RM, 'AGE': AGE, 'DIS': DIS, 'RAD': RAD, 'TAX': TAX,
-        'PTRATIO': PTRATIO, 'B': B, 'LSTAT': LSTAT
-    }
-    features = pd.DataFrame(data, index=[0])
-    return features
-
-input_df = user_input_features()
-
-# 4. Main Page - Displaying Selected Specs (The Fix)
-st.subheader("📋 Selected Property Specs")
-
-# CHANGE 1: use_container_width=True forces the table to fit the screen width
-# hide_index=True removes the ugly '0' column at the start
-st.dataframe(input_df, use_container_width=True, hide_index=True)
-
-# 5. Prediction Logic
-if st.button("🚀 Predict Price Now", type="primary"):
-    prediction = model.predict(input_df)
-    st.success(f"💰 Estimated Price: ${prediction[0] * 1000:,.2f}")
-
-# 6. "How It Works" Section (Moved Below)
-st.markdown("---") # Adds a divider line
-st.subheader("💡 How It Works")
-
-# CHANGE 2: Simple layout (no columns) so it sits at the bottom
-st.info("This application uses a machine learning model trained on historical housing data.")
-
+# 2. Custom CSS for "Attractive" UI
 st.markdown("""
-**Key factors influencing the price:**
-* **Rooms (RM):** The most significant positive factor. More rooms generally equal higher value.
-* **Neighborhood Status (LSTAT):** A strong indicator; lower status areas tend to have lower prices.
-* **Crime Rate (CRIM):** Higher crime rates negatively impact property value.
-""")
+<style>
+    /* Card Styling for Results */
+    .result-card {
+        background-color: #ffffff;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        border-left: 8px solid #4CAF50; /* Green accent */
+        transition: transform 0.2s;
+    }
+    .result-card:hover {
+        transform: scale(1.02);
+    }
+    .price-tag {
+        font-size: 24px;
+        font-weight: bold;
+        color: #2E7D32;
+    }
+    .feature-tag {
+        background-color: #f1f3f4;
+        border-radius: 15px;
+        padding: 4px 10px;
+        font-size: 12px;
+        margin-right: 5px;
+        color: #333;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# 3. Initialize Session State for History
+if 'history' not in st.session_state:
+    st.session_state.history = []
+
+# --- MAIN LAYOUT ---
+st.title("🏡 Real Estate Value Estimator")
+st.markdown("Predict Boston House Prices based on key features.")
+st.markdown("---")
+
+left_col, right_col = st.columns([1, 2.5], gap="large")
+
+# ==========================================
+# LEFT COLUMN: INPUTS (SCROLLABLE)
+# ==========================================
+with left_col:
+    st.subheader("⚙️ Configure Features")
+    
+    # !!! SCROLLER IS HERE !!!
+    with st.container(height=650, border=True):
+        st.info("Adjust the parameters below to predict price.")
+        
+        # Simulating standard Boston Housing Dataset features
+        crim = st.number_input("CRIM (Per capita crime rate)", value=0.006, format="%.4f")
+        zn = st.slider("ZN (Res. land zoned > 25k sq.ft)", 0, 100, 18)
+        indus = st.number_input("INDUS (Non-retail business acres)", value=2.31)
+        chas = st.selectbox("CHAS (Charles River dummy)", [0, 1], help="1 if tract bounds river; 0 otherwise")
+        nox = st.slider("NOX (Nitric oxides conc.)", 0.3, 0.9, 0.53, step=0.01)
+        
+        st.markdown("---")
+        rm = st.slider("RM (Avg rooms per dwelling)", 3.0, 9.0, 6.5, step=0.1)
+        age = st.slider("AGE (Units built prior to 1940)", 0.0, 100.0, 65.2)
+        dis = st.number_input("DIS (Distance to employment centres)", value=4.09)
+        
+        st.markdown("---")
+        rad = st.slider("RAD (Index of highway accessibility)", 1, 24, 1)
+        tax = st.number_input("TAX (Property-tax rate per $10k)", value=296.0)
+        ptratio = st.slider("PTRATIO (Pupil-teacher ratio)", 12.0, 22.0, 15.3)
+        lstat = st.slider("LSTAT (% Lower status of population)", 1.0, 40.0, 4.98)
+
+        st.write("") # Spacer
+        
+        # PREDICT BUTTON
+        if st.button("🚀 Predict Price", use_container_width=True, type="primary"):
+            # --- SIMULATION LOGIC (Replace with model.predict() later) ---
+            # Simple dummy formula for demonstration
+            # Price increases with Rooms, decreases with Crime and LSTAT
+            base_price = 22.0
+            pred_price = base_price + (rm * 3.5) - (lstat * 0.5) - (crim * 0.2) + (chas * 2)
+            pred_price = max(5.0, pred_price) # Ensure no negative prices
+            
+            # Save to history
+            new_record = {
+                "id": len(st.session_state.history) + 1,
+                "Rooms": rm,
+                "LSTAT": lstat,
+                "Crime": crim,
+                "Price": pred_price,
+                "River View": "Yes" if chas == 1 else "No"
+            }
+            # Insert at top of list
+            st.session_state.history.insert(0, new_record)
+            st.success("Prediction Generated!")
+
+# ==========================================
+# RIGHT COLUMN: RESULTS (NO SCROLLER)
+# ==========================================
+with right_col:
+    st.subheader("📊 Prediction Results")
+
+    # Metrics Row
+    if st.session_state.history:
+        df_hist = pd.DataFrame(st.session_state.history)
+        avg_price = df_hist['Price'].mean()
+        highest_price = df_hist['Price'].max()
+        
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Predictions Made", len(df_hist))
+        m2.metric("Avg Predicted Price", f"${avg_price:,.2f}k")
+        m3.metric("Highest Estimate", f"${highest_price:,.2f}k")
+    else:
+        st.info("👈 Use the panel on the left to generate your first prediction.")
+
+    st.markdown("---")
+
+    # Display Cards (Grid System)
+    if st.session_state.history:
+        grid_cols = st.columns(2)
+        
+        for i, record in enumerate(st.session_state.history):
+            with grid_cols[i % 2]:
+                
+                # Dynamic Border Color based on Price
+                border_color = "#4CAF50" # Green
+                if record['Price'] > 40: border_color = "#FFD700" # Gold for luxury
+                if record['Price'] < 15: border_color = "#FF5722" # Orange/Red for cheap
+                
+                st.markdown(f"""
+                <div class="result-card" style="border-left: 8px solid {border_color};">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:14px; color:#888;">ID: #{record['id']}</span>
+                        <span class="price-tag">${record['Price']:,.2f}k</span>
+                    </div>
+                    <hr style="margin: 10px 0;">
+                    <div style="margin-bottom:8px;">
+                        <span class="feature-tag">🛏️ {record['Rooms']} Rooms</span>
+                        <span class="feature-tag">📉 {record['LSTAT']}% LSTAT</span>
+                    </div>
+                    <div>
+                        <span class="feature-tag">🚓 {record['Crime']:.4f} CRIM</span>
+                        <span class="feature-tag">🌊 River: {record['River View']}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Clear Button
+                if st.button(f"Delete #{record['id']}", key=f"del_{record['id']}"):
+                    st.session_state.history.pop(i)
+                    st.rerun()
