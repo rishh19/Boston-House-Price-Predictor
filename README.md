@@ -62,16 +62,16 @@ During the analysis, we found the top drivers for house prices are:
 **LSTAT (Lower Status Population):** Strong negative correlation. Wealthier neighborhoods have higher prices.
 **PTRATIO (Pupil-Teacher Ratio):** Lower ratios (better schools) lead to higher property values.
 
-### 📂 Project Structure
+### 📜 License
+This project is open-source and available for educational purposes.
+## 📂 Project Structure
+```bash
 ├── House Price Prediction.ipynb   # Jupyter Notebook for Data Cleaning & Training
 ├── app.py                         # Main Streamlit Application Code
 ├── house_price_model.pkl          # Serialized (Saved) XGBoost Model
 ├── Project-House-Price-File.csv   # Original Dataset
 ├── requirements.txt               # List of dependencies
 └── README.md                      # Project Documentation
-
-### 📜 License
-This project is open-source and available for educational purposes.
 
 ✨ Built with ❤️ by Rishav Kumar Shrivastava
 
