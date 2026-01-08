@@ -154,4 +154,4 @@ with st.container():
 
 # Footer
 st.markdown("---")
-st.markdown("<div style='text-align: center; color: #888;'>Built with ❤️ as a Professional Portfolio Project using Streamlit & XGBoost.</div>", unsafe_allow_html=True)
+st.markdown("<div style='text-align: center; color: #888;'>Built with ❤️ by Rishav Kumar Shrivastava.</div>", unsafe_allow_html=True)
